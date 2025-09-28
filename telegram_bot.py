@@ -74,6 +74,13 @@ class MAGATelegramBot:
         self.auto_pilot = None
         self.job_api_manager = None
         self.mail_calendar = None
+        
+        # Новые компоненты для рутины
+        self.daily_briefing = None
+        self.smart_mail = None
+        self.meeting_assistant = None
+        self.personal_crm = None
+        self.focus_pomodoro = None
 
         # Состояния пользователей
         self.user_states: Dict[int, Dict[str, Any]] = {}
@@ -126,6 +133,24 @@ class MAGATelegramBot:
             # Success Prediction
             self.success_prediction = SuccessPredictionEngine()
 
+            # Инициализация новых компонентов для рутины
+            try:
+                from daily_briefing import DailyBriefing
+                from smart_mail import SmartMail
+                from meeting_assistant import MeetingAssistant
+                from personal_crm import PersonalCRM
+                from focus_pomodoro import FocusPomodoro
+                
+                self.daily_briefing = DailyBriefing()
+                self.smart_mail = SmartMail()
+                self.meeting_assistant = MeetingAssistant()
+                self.personal_crm = PersonalCRM()
+                self.focus_pomodoro = FocusPomodoro()
+                
+                self.logger.info("Новые компоненты рутины инициализированы")
+            except Exception as e:
+                self.logger.error(f"Ошибка инициализации компонентов рутины: {e}")
+            
             self.logger.info("Все компоненты МАГА инициализированы для Telegram бота")
 
         except Exception as e:
@@ -257,8 +282,17 @@ class MAGATelegramBot:
                 InlineKeyboardButton(text="⚡ Быстрые", callback_data="quick_actions")
             ],
             [
+                InlineKeyboardButton(text="🌅 Брифинг", callback_data="daily_briefing"),
+                InlineKeyboardButton(text="📧 Умная почта", callback_data="smart_mail"),
+                InlineKeyboardButton(text="🤝 Встречи", callback_data="meetings")
+            ],
+            [
+                InlineKeyboardButton(text="👥 CRM", callback_data="personal_crm"),
+                InlineKeyboardButton(text="🎯 Фокус", callback_data="focus_mode"),
+                InlineKeyboardButton(text="📊 Статистика", callback_data="stats")
+            ],
+            [
                 InlineKeyboardButton(text="🎤 Голосовые", callback_data="voice_commands"),
-                InlineKeyboardButton(text="📊 Статистика", callback_data="stats"),
                 InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings")
             ]
         ]
@@ -294,6 +328,16 @@ class MAGATelegramBot:
             await self._handle_quick_actions(callback)
         elif action == "voice_commands":
             await self._handle_voice_commands(callback)
+        elif action == "daily_briefing":
+            await self._handle_daily_briefing(callback)
+        elif action == "smart_mail":
+            await self._handle_smart_mail(callback)
+        elif action == "meetings":
+            await self._handle_meetings(callback)
+        elif action == "personal_crm":
+            await self._handle_personal_crm(callback)
+        elif action == "focus_mode":
+            await self._handle_focus_mode(callback)
         elif action == "stats":
             await self._handle_stats(callback)
         elif action == "settings":
@@ -1098,6 +1142,184 @@ class MAGATelegramBot:
 
         keyboard = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="negotiations")]]
         await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+    async def _handle_daily_briefing(self, callback: CallbackQuery):
+        """Обработка ежедневного брифинга"""
+        try:
+            if not self.daily_briefing:
+                await callback.message.edit_text("❌ Компонент Daily Briefing недоступен")
+                return
+            
+            # Генерируем утренний брифинг
+            briefing = await self.daily_briefing.generate_morning_briefing()
+            briefing_text = self.daily_briefing.format_briefing(briefing)
+            
+            # Кнопки для управления
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="🌙 Вечерний", callback_data="evening_briefing"),
+                    InlineKeyboardButton(text="🔄 Обновить", callback_data="daily_briefing")
+                ],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
+            ]
+            
+            await callback.message.edit_text(
+                briefing_text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка обработки брифинга: {e}")
+            await callback.message.edit_text("❌ Ошибка генерации брифинга")
+    
+    async def _handle_smart_mail(self, callback: CallbackQuery):
+        """Обработка умной почты"""
+        try:
+            if not self.smart_mail:
+                await callback.message.edit_text("❌ Компонент Smart Mail недоступен")
+                return
+            
+            # Получаем сводку по почте
+            summary = await self.smart_mail.get_email_summary()
+            
+            text = "📧 <b>Умная почта</b>\n\n"
+            text += f"📊 Всего писем: {summary.get('total_emails', 0)}\n"
+            text += f"📖 Непрочитанных: {summary.get('unread', 0)}\n"
+            text += f"⚠️ Важных: {summary.get('categories', {}).get('important', 0)}\n"
+            text += f"⏳ Ожидают ответа: {summary.get('requires_reply', 0)}\n\n"
+            
+            # Кнопки
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="📊 Анализ", callback_data="mail_analysis"),
+                    InlineKeyboardButton(text="📝 Шаблоны", callback_data="mail_templates")
+                ],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
+            ]
+            
+            await callback.message.edit_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка обработки умной почты: {e}")
+            await callback.message.edit_text("❌ Ошибка обработки почты")
+    
+    async def _handle_meetings(self, callback: CallbackQuery):
+        """Обработка встреч"""
+        try:
+            if not self.meeting_assistant:
+                await callback.message.edit_text("❌ Компонент Meeting Assistant недоступен")
+                return
+            
+            text = "🤝 <b>Ассистент встреч</b>\n\n"
+            text += "📅 Управление встречами:\n"
+            text += "• Подготовка к встрече\n"
+            text += "• Запись и транскрипция\n"
+            text += "• Конспект и action items\n\n"
+            
+            # Кнопки
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="📅 Подготовка", callback_data="meeting_prep"),
+                    InlineKeyboardButton(text="🎤 Запись", callback_data="meeting_record")
+                ],
+                [
+                    InlineKeyboardButton(text="📝 Конспект", callback_data="meeting_summary"),
+                    InlineKeyboardButton(text="📊 Статистика", callback_data="meeting_stats")
+                ],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
+            ]
+            
+            await callback.message.edit_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка обработки встреч: {e}")
+            await callback.message.edit_text("❌ Ошибка обработки встреч")
+    
+    async def _handle_personal_crm(self, callback: CallbackQuery):
+        """Обработка личного CRM"""
+        try:
+            if not self.personal_crm:
+                await callback.message.edit_text("❌ Компонент Personal CRM недоступен")
+                return
+            
+            # Получаем инсайты сети
+            insights = await self.personal_crm.get_network_insights()
+            insights_text = self.personal_crm.format_network_insights(insights)
+            
+            # Кнопки
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="👥 Контакты", callback_data="crm_contacts"),
+                    InlineKeyboardButton(text="➕ Добавить", callback_data="crm_add_contact")
+                ],
+                [
+                    InlineKeyboardButton(text="🔍 Поиск", callback_data="crm_search"),
+                    InlineKeyboardButton(text="⏰ Follow-up", callback_data="crm_followup")
+                ],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
+            ]
+            
+            await callback.message.edit_text(
+                insights_text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка обработки CRM: {e}")
+            await callback.message.edit_text("❌ Ошибка обработки CRM")
+    
+    async def _handle_focus_mode(self, callback: CallbackQuery):
+        """Обработка фокус-режима"""
+        try:
+            if not self.focus_pomodoro:
+                await callback.message.edit_text("❌ Компонент Focus Pomodoro недоступен")
+                return
+            
+            # Получаем текущий статус
+            status = self.focus_pomodoro.get_current_status()
+            
+            text = "🎯 <b>Фокус-режим</b>\n\n"
+            
+            if status['status'] == 'active':
+                text += f"⏱️ Активная сессия: {status['mode']}\n"
+                text += f"⏰ Осталось: {status['remaining_minutes']} мин {status['remaining_seconds']} сек\n"
+            else:
+                text += "💤 Нет активной сессии\n"
+            
+            # Получаем статистику
+            stats = await self.focus_pomodoro.get_focus_stats()
+            text += f"\n📊 Статистика:\n"
+            text += f"🎯 Сессий: {stats.total_sessions}\n"
+            text += f"⏱️ Время фокуса: {stats.total_focus_time} мин\n"
+            text += f"📈 Продуктивность: {stats.productivity_score:.1f}%\n"
+            
+            # Кнопки
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="🍅 Pomodoro", callback_data="start_pomodoro"),
+                    InlineKeyboardButton(text="☕ Перерыв", callback_data="start_break")
+                ],
+                [
+                    InlineKeyboardButton(text="📊 Статистика", callback_data="focus_stats"),
+                    InlineKeyboardButton(text="⚙️ Настройки", callback_data="focus_settings")
+                ],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
+            ]
+            
+            await callback.message.edit_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка обработки фокус-режима: {e}")
+            await callback.message.edit_text("❌ Ошибка обработки фокус-режима")
 
     async def run(self):
         """Запуск бота (совместимость с main.py)"""
