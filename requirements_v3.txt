@@ -1,31 +1,13 @@
-# AIMagistr 3.1 - Оптимизированные зависимости для Railway
+# AIMagistr 3.1 - Минимальные зависимости для Railway
 
-# Основные (минимальные версии)
-aiogram>=3.2.0
-loguru>=0.7.0
-requests>=2.31.0
-python-dotenv>=1.0.0
+# Основные
+aiogram==3.2.0
+loguru==0.7.2
+requests==2.31.0
+python-dotenv==1.0.0
 
-# Yandex AI (опционально)
-# yandex-cloud-ml-sdk>=0.1.0
-
-# RAG и эмбеддинги (опционально)
-# sentence-transformers>=2.2.0
-# faiss-cpu>=1.7.0
-# numpy>=1.24.0
-
-# Документы (опционально)
-# PyPDF2>=3.0.0
-# python-docx>=0.8.0
-# markdown>=3.5.0
-# beautifulsoup4>=4.12.0
-
-# Безопасность
-cryptography>=41.0.0
+# HTTP сервер
+aiohttp==3.9.1
 
 # Дополнительные
-aiofiles>=23.2.0
-Pillow>=10.0.0
-
-# HTTP сервер для health check
-aiohttp>=3.8.0
+aiofiles==23.2.1

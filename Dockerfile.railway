@@ -1,9 +1,7 @@
-# AIMagistr 3.1 - Финальный Docker для Railway
-# Максимальная стабильность и производительность
-
+# Финальный Dockerfile для Railway - максимальная стабильность
 FROM python:3.11-slim
 
-# Устанавливаем системные зависимости
+# Устанавливаем только критичные системные зависимости
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
@@ -13,14 +11,14 @@ RUN apt-get update && \
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем requirements
+# Копируем requirements.txt
 COPY requirements_final.txt requirements.txt
 
-# Устанавливаем Python зависимости
+# Устанавливаем Python зависимости с оптимизацией
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --no-deps -r requirements.txt
 
-# Копируем основные файлы
+# Копируем только необходимые файлы
 COPY telegram_bot_final.py .
 COPY health_check_final.py .
 

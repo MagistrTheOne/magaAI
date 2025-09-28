@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "Dockerfile.railway"
 
 [deploy]
 startCommand = "python telegram_bot_final.py"
@@ -16,3 +16,6 @@ variables = {
     PYTHONDONTWRITEBYTECODE = "1",
     PYTHONPATH = "/app"
 }
+
+[build.dockerfile]
+dockerfilePath = "Dockerfile.railway"
