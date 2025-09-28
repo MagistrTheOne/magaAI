@@ -1,31 +1,17 @@
-aiogram==3.4.1
+# Core dependencies
+aiogram>=3.4.1
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 httpx==0.27.2
 python-dotenv==1.0.1
-pydantic==2.9.2
-pytest==8.3.3
-pytest-asyncio==0.23.8
+pydantic>=2.4.1
+pydantic-settings>=2.0.0
 
-# Для OS интеграции
-psutil==5.9.8
+# Optional: Add if STT is enabled
+# pydub==0.25.1
+# soundfile==0.12.1
+# aiofiles==24.1.0
 
-# Для Zoom интеграции
-PyJWT==2.8.0
-
-# Для работы с существующими компонентами AIMagistr
-# Эти зависимости могут быть уже установлены в основном проекте
-
-# Для RAG и Memory Palace
-sentence-transformers==2.2.2
-chromadb==0.4.18
-numpy==1.24.3
-
-# Для аудио конвертации (ffmpeg-python)
-ffmpeg-python==0.2.0
-
-# Для Yandex Vision
-yandex-cloud-ml-sdk==0.2.0
-
-# Для работы с изображениями
-Pillow==10.0.1
+# Optional: For future features
+# redis==5.0.1
+# aiofiles==24.1.0

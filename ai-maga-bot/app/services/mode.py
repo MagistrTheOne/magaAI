@@ -1,138 +1,114 @@
-"""
-Логика режимов ответа и хранение настроек пользователей.
-"""
-import logging
-import re
-from typing import Dict, Literal, Optional
-from dataclasses import dataclass
+"""Mode management service for auto/text/voice reply logic."""
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class UserMode:
-    """Режим ответа пользователя."""
-    mode: Literal["auto", "text", "voice"]
-    user_id: int
+from typing import Dict, Literal
+from app.schemas import UserMode
 
 
 class ModeManager:
-    """Менеджер режимов ответа пользователей."""
-    
+    """Manager for user reply modes."""
+
     def __init__(self):
-        # In-memory хранилище режимов (для MVP)
-        # В продакшене можно заменить на Redis
-        self._user_modes: Dict[int, Literal["auto", "text", "voice"]] = {}
-    
-    def get_user_mode(self, user_id: int) -> Literal["auto", "text", "voice"]:
+        # In-memory storage for MVP (use Redis in production)
+        self._user_modes: Dict[int, UserMode] = {}
+
+    def get_user_mode(self, user_id: int) -> UserMode:
         """
-        Получить режим пользователя.
-        
+        Get user reply mode.
+
         Args:
-            user_id: ID пользователя
-            
+            user_id: Telegram user ID
+
         Returns:
-            Режим пользователя (по умолчанию "auto")
+            User mode (defaults to AUTO)
         """
-        return self._user_modes.get(user_id, "auto")
-    
-    def set_user_mode(self, user_id: int, mode: Literal["auto", "text", "voice"]) -> None:
+        return self._user_modes.get(user_id, UserMode.AUTO)
+
+    def set_user_mode(self, user_id: int, mode: UserMode) -> None:
         """
-        Установить режим пользователя.
-        
+        Set user reply mode.
+
         Args:
-            user_id: ID пользователя
-            mode: Новый режим
+            user_id: Telegram user ID
+            mode: New mode to set
         """
         self._user_modes[user_id] = mode
-        logger.info(f"Пользователь {user_id} установил режим: {mode}")
-    
+
     def determine_response_mode(
-        self, 
-        user_id: int, 
-        input_type: Literal["text", "voice"], 
-        text_content: Optional[str] = None
+        self,
+        user_id: int,
+        input_type: Literal["text", "voice"],
+        text_content: str = None
     ) -> Literal["text", "voice"]:
         """
-        Определить режим ответа на основе настроек пользователя и типа ввода.
-        
+        Determine response mode based on user settings and input.
+
         Args:
-            user_id: ID пользователя
-            input_type: Тип входящего сообщения
-            text_content: Содержимое текстового сообщения (если есть)
-            
+            user_id: Telegram user ID
+            input_type: Type of input ("text" or "voice")
+            text_content: Text content if input_type is "text"
+
         Returns:
-            Режим ответа ("text" или "voice")
+            Response mode ("text" or "voice")
         """
         user_mode = self.get_user_mode(user_id)
-        
-        # Если пользователь явно указал режим
-        if user_mode == "text":
+
+        # If user mode is explicit, use it
+        if user_mode == UserMode.TEXT:
             return "text"
-        elif user_mode == "voice":
+        elif user_mode == UserMode.VOICE:
             return "voice"
-        
-        # Auto-режим: определяем по контексту
+
+        # Auto mode logic
         if input_type == "voice":
-            # Голосовое сообщение → отвечаем голосом
             return "voice"
-        
-        if text_content:
-            # Проверяем маркеры в тексте
-            voice_markers = [
-                "voice", "/voice", "голос", "говори", "скажи"
-            ]
-            
-            text_lower = text_content.lower()
-            for marker in voice_markers:
-                if marker.lower() in text_lower:
-                    logger.debug(f"Найден маркер голоса '{marker}' в тексте")
-                    return "voice"
-        
-        # По умолчанию текстовый ответ
+
+        # Check for voice markers in text
+        if text_content and any(marker in text_content.lower() for marker in ["🔊", "voice", "/voice"]):
+            return "voice"
+
         return "text"
-    
-    def get_mode_description(self, mode: Literal["auto", "text", "voice"]) -> str:
+
+    def get_mode_description(self, mode: UserMode) -> str:
         """
-        Получить описание режима.
-        
+        Get human-readable description of a mode.
+
         Args:
-            mode: Режим
-            
+            mode: Mode to describe
+
         Returns:
-            Описание режима
+            Description string
         """
         descriptions = {
-            "auto": "Автоматический (голос → голос, текст → текст, с маркерами voice → голос)",
-            "text": "Всегда текстовые ответы",
-            "voice": "Всегда голосовые ответы"
+            UserMode.AUTO: "Автоматический режим: текст → текст, голос → голос, 🔊 → голос",
+            UserMode.TEXT: "Всегда отвечать текстом",
+            UserMode.VOICE: "Всегда отвечать голосом",
         }
         return descriptions.get(mode, "Неизвестный режим")
 
 
-# Глобальный экземпляр менеджера режимов
+# Global instance for easy access
 mode_manager = ModeManager()
 
 
-def get_user_mode(user_id: int) -> Literal["auto", "text", "voice"]:
-    """Получить режим пользователя."""
+def get_user_mode(user_id: int) -> UserMode:
+    """Get user mode (convenience function)."""
     return mode_manager.get_user_mode(user_id)
 
 
-def set_user_mode(user_id: int, mode: Literal["auto", "text", "voice"]) -> None:
-    """Установить режим пользователя."""
+def set_user_mode(user_id: int, mode: UserMode) -> None:
+    """Set user mode (convenience function)."""
     mode_manager.set_user_mode(user_id, mode)
 
 
 def determine_response_mode(
-    user_id: int, 
-    input_type: Literal["text", "voice"], 
-    text_content: Optional[str] = None
+    user_id: int,
+    input_type: Literal["text", "voice"],
+    text_content: str = None
 ) -> Literal["text", "voice"]:
-    """Определить режим ответа."""
+    """Determine response mode (convenience function)."""
     return mode_manager.determine_response_mode(user_id, input_type, text_content)
 
 
-def get_mode_description(mode: Literal["auto", "text", "voice"]) -> str:
-    """Получить описание режима."""
+def get_mode_description(mode: UserMode) -> str:
+    """Get mode description (convenience function)."""
     return mode_manager.get_mode_description(mode)

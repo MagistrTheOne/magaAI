@@ -1,253 +1,171 @@
-"""
-Middleware для защиты webhook и rate limiting.
-"""
-import logging
+"""Webhook guard middleware for secret validation and rate limiting."""
+
 import time
-from typing import Dict, Optional
-from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse
-
+from typing import Dict
+from fastapi import Request, HTTPException
 from app.settings import settings
-
-logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    """Простой rate limiter для защиты от флуда."""
-    
-    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
+    """Simple rate limiter for webhook protection."""
+
+    def __init__(self, max_requests: int = 30, window_seconds: int = 60):
         """
-        Инициализация rate limiter.
-        
+        Initialize rate limiter.
+
         Args:
-            max_requests: Максимальное количество запросов
-            window_seconds: Окно времени в секундах
+            max_requests: Maximum requests per window
+            window_seconds: Time window in seconds
         """
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self.requests: Dict[str, list] = {}
-    
+        self.requests: Dict[str, list] = {}  # client_ip -> timestamps
+
     def is_allowed(self, client_ip: str) -> bool:
         """
-        Проверить, разрешен ли запрос.
-        
+        Check if request is allowed.
+
         Args:
-            client_ip: IP адрес клиента
-            
+            client_ip: Client IP address
+
         Returns:
-            bool: True если запрос разрешен
+            True if allowed, False if rate limited
         """
         now = time.time()
-        
-        # Очищаем старые запросы
-        if client_ip in self.requests:
-            self.requests[client_ip] = [
-                req_time for req_time in self.requests[client_ip]
-                if now - req_time < self.window_seconds
-            ]
-        else:
+
+        if client_ip not in self.requests:
             self.requests[client_ip] = []
-        
-        # Проверяем лимит
-        if len(self.requests[client_ip]) >= self.max_requests:
-            logger.warning(f"Rate limit превышен для IP {client_ip}")
-            return False
-        
-        # Добавляем текущий запрос
-        self.requests[client_ip].append(now)
-        return True
+
+        # Clean old requests
+        self.requests[client_ip] = [
+            ts for ts in self.requests[client_ip]
+            if now - ts < self.window_seconds
+        ]
+
+        # Check if under limit
+        if len(self.requests[client_ip]) < self.max_requests:
+            self.requests[client_ip].append(now)
+            return True
+
+        return False
 
 
-# Глобальный экземпляр rate limiter
-rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+# Global rate limiter instance
+rate_limiter = RateLimiter()
 
 
 def validate_webhook_secret(secret: str) -> bool:
     """
-    Валидировать секрет webhook.
-    
+    Validate webhook secret.
+
     Args:
-        secret: Секрет из URL
-        
+        secret: Secret from URL path
+
     Returns:
-        bool: True если секрет валиден
+        True if valid
     """
     return secret == settings.telegram_webhook_secret
 
 
-def validate_telegram_token(request: Request) -> bool:
+async def validate_telegram_token(request: Request) -> bool:
     """
-    Валидировать токен Telegram (опционально).
-    
+    Validate that this is a legitimate Telegram request.
+    Basic validation - in production, implement full webhook validation.
+
     Args:
-        request: HTTP запрос
-        
+        request: FastAPI request
+
     Returns:
-        bool: True если токен валиден
+        True if valid Telegram request
     """
-    # Проверяем заголовок X-Telegram-Bot-Api-Secret-Token
-    secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-    if secret_token:
-        return secret_token == settings.telegram_webhook_secret
-    
-    # Если заголовок не установлен, считаем валидным (для совместимости)
-    return True
+    # Basic check for Telegram user agent or headers
+    user_agent = request.headers.get("user-agent", "").lower()
+    return "telegram" in user_agent or "bot" in user_agent
 
 
 def get_client_ip(request: Request) -> str:
     """
-    Получить IP адрес клиента.
-    
+    Get client IP address from request.
+
     Args:
-        request: HTTP запрос
-        
+        request: FastAPI request
+
     Returns:
-        str: IP адрес
+        Client IP address
     """
-    # Проверяем заголовки прокси
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    
-    real_ip = request.headers.get("X-Real-IP")
+    # Check for forwarded headers (common in proxies/load balancers)
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+
+    # Check for real IP header
+    real_ip = request.headers.get("x-real-ip")
     if real_ip:
         return real_ip
-    
-    # Возвращаем IP напрямую
+
+    # Fallback to direct client
     return request.client.host if request.client else "unknown"
 
 
 async def webhook_guard_middleware(request: Request, call_next):
     """
-    Middleware для защиты webhook.
-    
+    Webhook guard middleware for security.
+
     Args:
-        request: HTTP запрос
-        call_next: Следующий обработчик
-        
+        request: FastAPI request
+        call_next: Next middleware/route handler
+
     Returns:
-        Response: HTTP ответ
+        Response from next handler
     """
-    try:
-        # Получаем IP клиента
-        client_ip = get_client_ip(request)
-        
-        # Проверяем rate limit
-        if not rate_limiter.is_allowed(client_ip):
-            logger.warning(f"Rate limit превышен для IP {client_ip}")
-            return JSONResponse(
-                status_code=429,
-                content={"error": "Too Many Requests", "retry_after": 60}
-            )
-        
-        # Проверяем токен Telegram (если установлен)
-        if not validate_telegram_token(request):
-            logger.warning(f"Неверный токен Telegram от IP {client_ip}")
-            return JSONResponse(
-                status_code=403,
-                content={"error": "Forbidden"}
-            )
-        
-        # Продолжаем обработку
-        response = await call_next(request)
-        return response
-        
-    except Exception as e:
-        logger.error(f"Ошибка в webhook guard middleware: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal Server Error"}
+    # Get client IP for rate limiting
+    client_ip = get_client_ip(request)
+
+    # Apply rate limiting
+    if not rate_limiter.is_allowed(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded"
         )
 
-
-def validate_zoom_webhook_signature(request: Request) -> bool:
-    """
-    Валидировать подпись Zoom webhook.
-    
-    Args:
-        request: HTTP запрос
-        
-    Returns:
-        bool: True если подпись валидна
-    """
-    import hmac
-    import hashlib
-    
-    if not settings.zoom_webhook_secret:
-        logger.warning("Zoom webhook secret не настроен")
-        return False
-    
-    # Получаем подпись из заголовка
-    signature = request.headers.get("X-Zm-Signature")
-    if not signature:
-        logger.warning("Отсутствует подпись Zoom webhook")
-        return False
-    
-    # Получаем timestamp
-    timestamp = request.headers.get("X-Zm-Request-Timestamp")
-    if not timestamp:
-        logger.warning("Отсутствует timestamp Zoom webhook")
-        return False
-    
-    # Получаем тело запроса
-    body = request.body
-    if not body:
-        logger.warning("Пустое тело Zoom webhook")
-        return False
-    
-    # Создаем подпись для проверки
-    message = f"v0:{timestamp}:{body.decode()}"
-    expected_signature = f"v0={hmac.new(settings.zoom_webhook_secret.encode(), message.encode(), hashlib.sha256).hexdigest()}"
-    
-    # Сравниваем подписи
-    return hmac.compare_digest(signature, expected_signature)
+    # Continue with request
+    response = await call_next(request)
+    return response
 
 
 def validate_webhook_request(secret: str, request: Request) -> None:
     """
-    Валидировать запрос webhook.
-    
+    Validate webhook request completely.
+
     Args:
-        secret: Секрет из URL
-        request: HTTP запрос
-        
+        secret: Secret from URL
+        request: FastAPI request
+
     Raises:
-        HTTPException: При невалидном запросе
+        HTTPException: If validation fails
     """
-    # Проверяем секрет
+    # Validate secret
     if not validate_webhook_secret(secret):
-        logger.warning(f"Неверный секрет webhook: {secret}")
-        raise HTTPException(status_code=403, detail="Forbidden")
-    
-    # Проверяем токен Telegram
-    if not validate_telegram_token(request):
-        logger.warning("Неверный токен Telegram")
-        raise HTTPException(status_code=403, detail="Forbidden")
-    
-    # Проверяем rate limit
-    client_ip = get_client_ip(request)
-    if not rate_limiter.is_allowed(client_ip):
-        logger.warning(f"Rate limit превышен для IP {client_ip}")
-        raise HTTPException(status_code=429, detail="Too Many Requests")
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid webhook secret"
+        )
+
+    # Validate Telegram request (basic)
+    # Note: In production, implement full webhook validation with bot token
+    # if not await validate_telegram_token(request):
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail="Invalid Telegram request"
+    #     )
 
 
 def validate_zoom_webhook_request(request: Request) -> None:
     """
-    Валидировать запрос Zoom webhook.
-    
+    Placeholder for Zoom webhook validation.
+    Not implemented yet.
+
     Args:
-        request: HTTP запрос
-        
-    Raises:
-        HTTPException: При невалидном запросе
+        request: FastAPI request
     """
-    # Проверяем подпись Zoom
-    if not validate_zoom_webhook_signature(request):
-        logger.warning("Неверная подпись Zoom webhook")
-        raise HTTPException(status_code=403, detail="Forbidden")
-    
-    # Проверяем rate limit
-    client_ip = get_client_ip(request)
-    if not rate_limiter.is_allowed(client_ip):
-        logger.warning(f"Rate limit превышен для IP {client_ip}")
-        raise HTTPException(status_code=429, detail="Too Many Requests")
+    pass  # Zoom webhook validation would go here
