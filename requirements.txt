@@ -2,8 +2,6 @@
 python-telegram-bot==20.7
 aiogram==3.4.1
 requests==2.31.0
-asyncio==3.4.3
-typing==3.7.4.3
 
 # AI/ML dependencies
 torch==2.1.2
@@ -13,14 +11,13 @@ scikit-learn==1.3.2
 pandas==2.1.4
 numpy==1.24.3
 chromadb==0.4.22
+nltk==3.8.1
 
 # Audio processing
 sounddevice==0.4.6
-soundcard==0.4.2
 pydub==0.25.1
 faster-whisper==0.10.0
 edge-tts==6.1.10
-Tortoise-TTS==3.0.0
 
 # Computer vision
 opencv-python==4.8.1.78
@@ -29,7 +26,6 @@ pytesseract==0.3.10
 
 # Desktop automation
 pyautogui==0.9.54
-pygetwindow==0.0.9
 psutil==5.9.6
 
 # Browser automation
@@ -43,7 +39,6 @@ imapclient==2.3.1
 # System utilities
 python-dotenv==1.0.0
 loguru==0.7.2
-pywin32==306; sys_platform == 'win32'
 
 # Development dependencies
 pytest==7.4.3

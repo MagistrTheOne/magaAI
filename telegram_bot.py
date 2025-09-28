@@ -38,11 +38,25 @@ class MAGATelegramBot:
     Telegram бот для управления МАГА
     """
 
-    def __init__(self, token: str):
+    def __init__(self, token: str = None):
         """
         Args:
-            token: Telegram Bot Token
+            token: Telegram Bot Token (optional, will be loaded from env/secrets)
         """
+        # Получаем токен из переменных окружения или secrets
+        if not token:
+            token = os.getenv("TELEGRAM_BOT_TOKEN")
+            if not token:
+                try:
+                    from secrets_watchdog import SecretsWatchdogManager
+                    secrets_manager = SecretsWatchdogManager()
+                    token = secrets_manager.get_secret("TELEGRAM_BOT_TOKEN")
+                except ImportError:
+                    pass
+        
+        if not token:
+            raise ValueError("TELEGRAM_BOT_TOKEN не найден. Установите переменную окружения или в secrets.")
+        
         self.token = token
         self.bot = Bot(
             token=token,
@@ -57,6 +71,9 @@ class MAGATelegramBot:
         self.memory_palace = None
         self.success_prediction = None
         self.secrets_manager = None
+        self.auto_pilot = None
+        self.job_api_manager = None
+        self.mail_calendar = None
 
         # Состояния пользователей
         self.user_states: Dict[int, Dict[str, Any]] = {}
@@ -1036,6 +1053,10 @@ class MAGATelegramBot:
 
         keyboard = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="negotiations")]]
         await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+    async def run(self):
+        """Запуск бота (совместимость с main.py)"""
+        await self.start_polling()
 
     async def start_polling(self):
         """Запуск бота"""
