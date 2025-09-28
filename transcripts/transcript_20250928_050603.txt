@@ -1,0 +1,2 @@
+[05:06:03] [STT] Listening… (saving to transcripts\transcript_20250928_050603.txt)
+[05:06:11] [STT] Stopped.

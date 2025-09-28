@@ -1,0 +1,96 @@
+{
+  "technical_python": [
+    {
+      "id": "py_001",
+      "category": "technical",
+      "difficulty": "middle",
+      "question": "Расскажите о генераторах в Python. Приведите пример использования.",
+      "expected_answer": "Генераторы - это функции, которые возвращают итератор. Они используют yield вместо return.",
+      "key_points": [
+        "lazy evaluation",
+        "yield",
+        "memory efficient",
+        "iteration"
+      ],
+      "follow_ups": [
+        "Чем отличается генератор от списка?",
+        "Когда использовать генераторы?"
+      ]
+    },
+    {
+      "id": "py_002",
+      "category": "technical",
+      "difficulty": "senior",
+      "question": "Как работает GIL в Python? Какие проблемы это создает?",
+      "expected_answer": "GIL (Global Interpreter Lock) позволяет только одному потоку выполнять Python код одновременно.",
+      "key_points": [
+        "threading limitations",
+        "multiprocessing",
+        "async/await",
+        "concurrent.futures"
+      ],
+      "follow_ups": [
+        "Как обойти ограничения GIL?",
+        "Когда использовать multiprocessing?"
+      ]
+    }
+  ],
+  "system_design": [
+    {
+      "id": "sd_001",
+      "category": "system_design",
+      "difficulty": "senior",
+      "question": "Как спроектировать систему обработки 1 млн запросов в секунду?",
+      "expected_answer": "Нужно учитывать масштабируемость, отказоустойчивость, кэширование, балансировку нагрузки.",
+      "key_points": [
+        "load balancing",
+        "caching",
+        "database sharding",
+        "CDN",
+        "monitoring"
+      ],
+      "follow_ups": [
+        "Как обеспечить отказоустойчивость?",
+        "Какие метрики мониторить?"
+      ]
+    }
+  ],
+  "behavioral": [
+    {
+      "id": "bh_001",
+      "category": "behavioral",
+      "difficulty": "middle",
+      "question": "Расскажите о ситуации, когда вы решали сложную техническую проблему.",
+      "expected_answer": "STAR метод: ситуация, задача, действия, результат.",
+      "key_points": [
+        "problem analysis",
+        "solution approach",
+        "teamwork",
+        "learning"
+      ],
+      "follow_ups": [
+        "Что вы узнали из этой ситуации?",
+        "Как бы поступили иначе?"
+      ]
+    }
+  ],
+  "ml_ai": [
+    {
+      "id": "ml_001",
+      "category": "ml_ai",
+      "difficulty": "senior",
+      "question": "Как избежать переобучения модели машинного обучения?",
+      "expected_answer": "Кросс-валидация, регуляризация, ранняя остановка, увеличение данных.",
+      "key_points": [
+        "cross-validation",
+        "regularization",
+        "early stopping",
+        "data augmentation"
+      ],
+      "follow_ups": [
+        "Какие метрики использовать?",
+        "Как выбрать модель?"
+      ]
+    }
+  ]
+}

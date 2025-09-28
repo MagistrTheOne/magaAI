@@ -1,0 +1,16 @@
+[05:21:44] [STT] Listening from loopback… (saving to transcripts\transcript_loopback_20250928_052144.txt)
+[05:21:46] [STT] Stopped.
+[05:21:51] [STT] Source switched to: loopback
+[05:21:52] [STT] Source switched to: microphone
+[05:21:54] [AI] Assistant ON
+[05:21:54] [AI] 🤖 AI-ассистент активирован! Буду анализировать HR и отвечать автономно.
+[05:21:54] [AI] 💰 Целевая зарплата: $200,000
+[05:21:54] [AI] 🎯 Режим: Агрессивный переговорщик
+[05:21:55] [AI] Assistant OFF
+[05:21:56] [TTS] Using Edge TTS...
+[05:21:56] [TTS error] TTS conversion failed (check FFmpeg): Invalid pitch '+0%'.
+[05:21:56] [TTS] Using Edge TTS...
+[05:21:56] [TTS error] TTS conversion failed (check FFmpeg): Invalid pitch '+0%'.
+[05:21:56] [TTS] Using Edge TTS...
+[05:21:56] [TTS error] TTS conversion failed (check FFmpeg): Invalid pitch '+0%'.
+[05:27:08] [STT] Stopped.
