@@ -52,8 +52,18 @@ class BrainManager:
         self.api_key = os.getenv('YANDEX_API_KEY')
         self.model_uri = os.getenv('YANDEX_MODEL_URI', 'gpt://b1gej5c8msk7iqfjv11p/yandexgpt/latest')
         self.folder_id = os.getenv('YANDEX_FOLDER_ID')
+        self.system_prompt = os.getenv('SYSTEM_PROMPT', 'Ты Ассистент Мага - умный ИИ-помощник для автоматизации рутины и повышения продуктивности.')
         self.translate_enabled = os.getenv('YANDEX_TRANSLATE_ENABLED', 'false').lower() == 'true'
         self.vision_enabled = os.getenv('YANDEX_VISION_ENABLED', 'false').lower() == 'true'
+        
+        # Метрики
+        self.metrics = {
+            'total_requests': 0,
+            'successful_requests': 0,
+            'failed_requests': 0,
+            'total_tokens': 0,
+            'total_time': 0.0
+        }
         
         # Клиент
         self.client = None
@@ -61,11 +71,12 @@ class BrainManager:
         
         # Настройки
         self.config = {
-            'max_tokens': 4000,
+            'max_tokens': int(os.getenv('MAX_CONTEXT_TOKENS', '4000')),
             'temperature': 0.3,
             'top_p': 0.9,
-            'stream': False,
-            'timeout': 30
+            'stream': os.getenv('ENABLE_STREAMING', 'false').lower() == 'true',
+            'timeout': int(os.getenv('REQUEST_TIMEOUT', '30')),
+            'max_retries': int(os.getenv('MAX_RETRIES', '3'))
         }
         
         # Инициализация
@@ -93,49 +104,77 @@ class BrainManager:
             self.is_authenticated = False
     
     async def generate_response(self, prompt: str, system_prompt: str = None, **kwargs) -> str:
-        """Генерация ответа (совместимость с GigaChat)"""
-        try:
-            if not self.is_authenticated:
-                return "AI клиент не инициализирован"
-            
-            # Подготовка сообщений
-            messages = []
-            
-            if system_prompt:
-                messages.append({
-                    "role": "system",
-                    "text": system_prompt
-                })
-            
-            messages.append({
-                "role": "user", 
-                "text": prompt
-            })
-            
-            # Параметры генерации
-            generation_options = {
-                "max_tokens": kwargs.get('max_tokens', self.config['max_tokens']),
-                "temperature": kwargs.get('temperature', self.config['temperature']),
-                "top_p": kwargs.get('top_p', self.config['top_p'])
-            }
-            
-            # Вызов API
-            response = self.client.chat.completions.create(
-                model=self.model_uri,
-                messages=messages,
-                generation_options=generation_options
-            )
-            
-            # Извлечение ответа
-            if response.choices and len(response.choices) > 0:
-                content = response.choices[0].message.content
-                return content.strip()
-            else:
-                return "Пустой ответ от AI"
+        """Генерация ответа с системным промптом и ретраями"""
+        start_time = time.time()
+        self.metrics['total_requests'] += 1
+        
+        # Используем системный промпт по умолчанию
+        if not system_prompt:
+            system_prompt = self.system_prompt
+        
+        for attempt in range(self.config['max_retries']):
+            try:
+                if not self.is_authenticated:
+                    self.metrics['failed_requests'] += 1
+                    return "AI клиент не инициализирован"
                 
-        except Exception as e:
-            self.logger.error(f"Ошибка генерации ответа: {e}")
-            return f"Ошибка: {str(e)}"
+                # Подготовка сообщений
+                messages = [
+                    {
+                        "role": "system",
+                        "text": system_prompt
+                    },
+                    {
+                        "role": "user", 
+                        "text": prompt
+                    }
+                ]
+                
+                # Параметры генерации
+                generation_options = {
+                    "max_tokens": kwargs.get('max_tokens', self.config['max_tokens']),
+                    "temperature": kwargs.get('temperature', self.config['temperature']),
+                    "top_p": kwargs.get('top_p', self.config['top_p'])
+                }
+                
+                # Вызов API с таймаутом
+                response = self.client.chat.completions.create(
+                    model=self.model_uri,
+                    messages=messages,
+                    generation_options=generation_options
+                )
+                
+                # Извлечение ответа
+                if response.choices and len(response.choices) > 0:
+                    content = response.choices[0].message.content
+                    
+                    # Обновляем метрики
+                    self.metrics['successful_requests'] += 1
+                    self.metrics['total_time'] += time.time() - start_time
+                    
+                    if hasattr(response, 'usage') and response.usage:
+                        self.metrics['total_tokens'] += getattr(response.usage, 'total_tokens', 0)
+                    
+                    return content.strip()
+                else:
+                    if attempt < self.config['max_retries'] - 1:
+                        await asyncio.sleep(1)  # Пауза перед повтором
+                        continue
+                    else:
+                        self.metrics['failed_requests'] += 1
+                        return "Пустой ответ от AI"
+                        
+            except Exception as e:
+                self.logger.error(f"Ошибка генерации ответа (попытка {attempt + 1}): {e}")
+                if attempt < self.config['max_retries'] - 1:
+                    await asyncio.sleep(2 ** attempt)  # Экспоненциальная задержка
+                    continue
+                else:
+                    self.metrics['failed_requests'] += 1
+                    return f"Ошибка после {self.config['max_retries']} попыток: {str(e)}"
+        
+        self.metrics['failed_requests'] += 1
+        return "Превышено максимальное количество попыток"
     
     async def generate_stream(self, prompt: str, system_prompt: str = None, **kwargs) -> AsyncGenerator[str, None]:
         """Стриминговая генерация ответа"""
@@ -274,7 +313,38 @@ class BrainManager:
             "authenticated": self.is_authenticated,
             "translate_enabled": self.translate_enabled,
             "vision_enabled": self.vision_enabled,
-            "config": self.config
+            "config": self.config,
+            "metrics": self.metrics
+        }
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        """Получение метрик производительности"""
+        success_rate = 0
+        if self.metrics['total_requests'] > 0:
+            success_rate = self.metrics['successful_requests'] / self.metrics['total_requests']
+        
+        avg_time = 0
+        if self.metrics['successful_requests'] > 0:
+            avg_time = self.metrics['total_time'] / self.metrics['successful_requests']
+        
+        return {
+            "total_requests": self.metrics['total_requests'],
+            "successful_requests": self.metrics['successful_requests'],
+            "failed_requests": self.metrics['failed_requests'],
+            "success_rate": round(success_rate, 3),
+            "total_tokens": self.metrics['total_tokens'],
+            "avg_response_time": round(avg_time, 3),
+            "total_time": round(self.metrics['total_time'], 3)
+        }
+    
+    def reset_metrics(self):
+        """Сброс метрик"""
+        self.metrics = {
+            'total_requests': 0,
+            'successful_requests': 0,
+            'failed_requests': 0,
+            'total_tokens': 0,
+            'total_time': 0.0
         }
     
     async def health_check(self) -> Dict[str, Any]:

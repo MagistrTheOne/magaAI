@@ -28,7 +28,7 @@ class YandexTranslate:
         # Конфигурация
         self.api_key = os.getenv('YANDEX_API_KEY')
         self.folder_id = os.getenv('YANDEX_FOLDER_ID')
-        self.enabled = os.getenv('YANDEX_TRANSLATE_ENABLED', 'false').lower() == 'true'
+        self.enabled = os.getenv('YANDEX_TRANSLATE_ENABLED', 'true').lower() == 'true'
         
         # Клиент
         self.client = None

@@ -1,0 +1,35 @@
+# AIMagistr 3.0 - Зависимости
+
+# Основные
+aiogram==3.2.0
+asyncio==3.4.3
+loguru==0.7.2
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Yandex AI
+yandex-cloud-ml-sdk==0.1.0
+
+# RAG и эмбеддинги
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+numpy==1.24.3
+
+# Документы
+PyPDF2==3.0.1
+python-docx==0.8.11
+markdown==3.5.1
+beautifulsoup4==4.12.2
+
+# Безопасность
+cryptography==41.0.4
+
+# Тестирование
+pytest==7.4.2
+pytest-asyncio==0.21.1
+unittest-mock==1.0.1
+
+# Дополнительные
+aiofiles==23.2.1
+Pillow==10.0.1
+python-multipart==0.0.6

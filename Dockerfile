@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Копируем requirements.txt первым для кэширования слоев
-COPY requirements.txt .
+COPY requirements_v3.txt requirements.txt
 
 # Устанавливаем Python зависимости
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -56,4 +56,4 @@ USER appuser
 EXPOSE 8000
 
 # Запускаем приложение
-CMD ["python", "main.py"]
+CMD ["python", "telegram_bot_v3.py"]

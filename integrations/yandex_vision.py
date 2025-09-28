@@ -29,7 +29,7 @@ class YandexVision:
         # Конфигурация
         self.api_key = os.getenv('YANDEX_API_KEY')
         self.folder_id = os.getenv('YANDEX_FOLDER_ID')
-        self.enabled = os.getenv('YANDEX_VISION_ENABLED', 'false').lower() == 'true'
+        self.enabled = os.getenv('YANDEX_VISION_ENABLED', 'true').lower() == 'true'
         
         # Клиент
         self.client = None
