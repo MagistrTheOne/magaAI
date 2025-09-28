@@ -52,7 +52,7 @@ TORTOISE_AVAILABLE = False
 
 # --- Brain SDK (GigaChat + RAG) ---
 try:
-    from brain.gigachat_sdk import BrainManager, GigaChatConfig
+    from brain.ai_client import BrainManager
     from brain.rag_index import RAGManager
     BRAIN_AVAILABLE = True
 except ImportError:

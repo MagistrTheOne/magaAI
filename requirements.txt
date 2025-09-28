@@ -48,3 +48,6 @@ flake8==6.1.0
 feedparser==6.0.10
 schedule==1.2.0
 pywin32==306
+
+# Yandex AI SDK
+yandex-cloud-ml-sdk==0.1.0

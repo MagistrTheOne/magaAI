@@ -18,7 +18,7 @@ import threading
 
 try:
     from memory_palace import MemoryPalace
-    from brain.gigachat_sdk import BrainManager
+    from brain.ai_client import BrainManager
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Некоторые компоненты недоступны: {e}")

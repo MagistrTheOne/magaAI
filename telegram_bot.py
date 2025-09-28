@@ -19,7 +19,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 # Импорты МАГА компонентов
 try:
-    from brain.gigachat_sdk import BrainManager, GigaChatConfig
+    from brain.ai_client import BrainManager
     from intent_engine import IntentEngine
     from quantum_negotiation import QuantumNegotiationEngine
     from memory_palace import MemoryPalace

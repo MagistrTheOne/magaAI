@@ -13,7 +13,7 @@ import logging
 
 try:
     from mail_calendar import MailCalendar
-    from brain.gigachat_sdk import BrainManager
+    from brain.ai_client import BrainManager
     from memory_palace import MemoryPalace
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
