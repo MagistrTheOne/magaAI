@@ -1188,11 +1188,15 @@ class App:
                 if self.overlay_hud and self.overlay_hud_active:
                     self.overlay_hud.set_status(HUDStatus.PROCESSING, "Анализ шансов...")
 
-                # Создаем фичи для прогноза (сейчас заглушки, потом из контекста)
+                # Создаем фичи для прогноза - извлекаем из контекста
+                company_size = self._extract_company_size_from_context()
+                industry = self._extract_industry_from_context()
+                role_level = self._extract_role_level_from_context()
+                
                 features = PredictionFeatures(
-                    company_size="mid",  # TODO: извлекать из контекста
-                    industry="tech",     # TODO: извлекать из контекста
-                    role_level="senior", # TODO: извлекать из контекста
+                    company_size=company_size,
+                    industry=industry,
+                    role_level=role_level,
                     interview_round=1,
                     time_spent=5.0,      # часов подготовки
                     questions_asked=3,
@@ -1934,7 +1938,7 @@ class App:
                 content=f"HR сказал: {text}",
                 metadata={
                     'type': 'hr_message',
-                    'company': 'unknown',  # TODO: извлекать из контекста
+                    'company': self._extract_company_from_context(),
                     'source': 'conversation'
                 },
                 tags=['hr', 'conversation', 'input']
@@ -1983,6 +1987,102 @@ class App:
 
         # Запускаем GUI
         self.root.mainloop()
+    
+    def _extract_company_size_from_context(self) -> str:
+        """Извлекает размер компании из контекста"""
+        try:
+            # Анализируем текст на экране для определения размера компании
+            screen_text = self._get_screen_text()
+            
+            # Ключевые слова для определения размера
+            if any(word in screen_text.lower() for word in ['startup', 'стартап', 'малый', 'small']):
+                return "startup"
+            elif any(word in screen_text.lower() for word in ['корпорация', 'corporation', 'крупная', 'большая']):
+                return "enterprise"
+            elif any(word in screen_text.lower() for word in ['средняя', 'medium', 'mid']):
+                return "mid"
+            else:
+                return "mid"  # По умолчанию
+                
+        except Exception as e:
+            self.log(f"Ошибка извлечения размера компании: {e}")
+            return "mid"
+    
+    def _extract_industry_from_context(self) -> str:
+        """Извлекает отрасль из контекста"""
+        try:
+            screen_text = self._get_screen_text()
+            
+            # Определяем отрасль по ключевым словам
+            if any(word in screen_text.lower() for word in ['fintech', 'финтех', 'банк', 'bank', 'финансы']):
+                return "fintech"
+            elif any(word in screen_text.lower() for word in ['ecommerce', 'e-commerce', 'торговля', 'retail']):
+                return "ecommerce"
+            elif any(word in screen_text.lower() for word in ['gaming', 'игры', 'game']):
+                return "gaming"
+            elif any(word in screen_text.lower() for word in ['ai', 'ml', 'искусственный интеллект', 'машинное обучение']):
+                return "ai"
+            else:
+                return "tech"  # По умолчанию
+                
+        except Exception as e:
+            self.log(f"Ошибка извлечения отрасли: {e}")
+            return "tech"
+    
+    def _extract_role_level_from_context(self) -> str:
+        """Извлекает уровень позиции из контекста"""
+        try:
+            screen_text = self._get_screen_text()
+            
+            # Определяем уровень позиции
+            if any(word in screen_text.lower() for word in ['junior', 'младший', 'entry', 'начальный']):
+                return "junior"
+            elif any(word in screen_text.lower() for word in ['senior', 'старший', 'ведущий']):
+                return "senior"
+            elif any(word in screen_text.lower() for word in ['lead', 'руководитель', 'team lead']):
+                return "lead"
+            elif any(word in screen_text.lower() for word in ['principal', 'архитектор', 'architect']):
+                return "principal"
+            else:
+                return "senior"  # По умолчанию
+                
+        except Exception as e:
+            self.log(f"Ошибка извлечения уровня позиции: {e}")
+            return "senior"
+    
+    def _extract_company_from_context(self) -> str:
+        """Извлекает название компании из контекста"""
+        try:
+            screen_text = self._get_screen_text()
+            
+            # Ищем известные компании
+            known_companies = ['яндекс', 'yandex', 'сбер', 'sber', 'тинькофф', 'tinkoff', 'vk', 'ozon', 'mail.ru']
+            
+            for company in known_companies:
+                if company in screen_text.lower():
+                    return company.title()
+            
+            return "unknown"
+                
+        except Exception as e:
+            self.log(f"Ошибка извлечения компании: {e}")
+            return "unknown"
+    
+    def _get_screen_text(self) -> str:
+        """Получает текст с экрана для анализа"""
+        try:
+            # Используем OCR для получения текста с экрана
+            if hasattr(self, 'ocr_engine') and self.ocr_engine:
+                # Реальный OCR
+                screenshot = self._capture_screenshot()
+                text = self.ocr_engine.extract_text(screenshot)
+                return text
+            else:
+                # Fallback - возвращаем пустую строку
+                return ""
+        except Exception as e:
+            self.log(f"Ошибка получения текста с экрана: {e}")
+            return ""
 
 
 if __name__ == "__main__":

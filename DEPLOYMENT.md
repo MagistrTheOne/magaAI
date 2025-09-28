@@ -59,13 +59,74 @@ python test_local.py
 
 ## Развертывание на Railway
 
+### 1. Подготовка
 1. Подключите GitHub репозиторий к Railway
 2. Railway автоматически обнаружит Dockerfile
-3. Установите переменные окружения
-4. Деплой произойдет автоматически
+3. Установите переменные окружения из `railway.env.example`
 
-## Health Check
+### 2. Переменные окружения Railway
+```bash
+# ОБЯЗАТЕЛЬНЫЕ (из .env.example)
+TELEGRAM_BOT_TOKEN=7982777819:AAEi1DVROTDWpCq1EMfKP6useaIlNHIRrIg
+GIGACHAT_CLIENT_ID=0199824b-4c1e-7ef1-b423-bb3156ddecee
+GIGACHAT_CLIENT_SECRET=c3c67b8e-1c84-47a0-8cb6-8b392664e4a9
+GIGACHAT_SCOPE=GIGACHAT_API_PERS
+GIGACHAT_AUTH_KEY=MDE5OTgyNGItNGMxZS03ZWYxLWI0MjMtYmIzMTU2ZGRlY2VlOmMzYzY3YjhlLTFjODQtNDdhMC04Y2I2LThiMzkyNjY0ZTRhOQ==
 
+# ПЕРСОНАЛЬНЫЕ ДАННЫЕ
+PHONE_NUMBER=+79884135937
+EMAIL_ADDRESS=maxonyushko71@gmail.com
+NAME=Максим Онюшко
+LINKEDIN_URL=https://www.linkedin.com/in/magistrtheone/
+GITHUB_URL=https://github.com/MagistrTheOne
+PORTFOLIO_URL=https://magistrtheone.vercel.app/
+
+# ОПЦИОНАЛЬНЫЕ
+SUPERJOB_API_KEY=your_superjob_key
+LINKEDIN_ACCESS_TOKEN=your_linkedin_token
+EMAIL_IMAP_SERVER=imap.gmail.com
+EMAIL_USERNAME=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+```
+
+### 3. Docker конфигурация
+- ✅ Python 3.11-slim
+- ✅ Системные зависимости (ffmpeg, tesseract, OpenGL)
+- ✅ Playwright с Chromium
+- ✅ NLTK данные
+- ✅ Безопасный пользователь
+- ✅ Headless режим
+
+### 4. Быстрая проверка готовности
+```bash
+# Проверить готовность к деплою
+chmod +x check-deployment.sh
+./check-deployment.sh
+```
+
+### 5. Тестирование локально
+```bash
+# Сделать скрипт исполняемым
+chmod +x docker-test.sh
+
+# Запустить тест
+./docker-test.sh
+```
+
+### 6. Быстрый деплой
+```bash
+# Установить Railway CLI
+npm install -g @railway/cli
+
+# Авторизация
+railway login
+
+# Быстрый деплой
+chmod +x deploy-railway.sh
+./deploy-railway.sh
+```
+
+### 5. Health Check
 Приложение доступно по адресу: `https://your-app.railway.app/health`
 
 Ответ:
@@ -76,3 +137,8 @@ python test_local.py
   "timestamp": 1234567890.123
 }
 ```
+
+### 6. Мониторинг
+- Railway автоматически перезапускает при сбоях
+- Health check каждые 30 секунд
+- Логи доступны в Railway Dashboard

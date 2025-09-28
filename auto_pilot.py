@@ -204,13 +204,13 @@ class AutoPilot:
                         discovered_jobs.extend(real_jobs)
                     except Exception as e:
                         self.logger.error(f"Ошибка поиска вакансий через API: {e}")
-                        # Fallback на mock данные
-                        mock_jobs = self._mock_job_search(keyword)
-                        discovered_jobs.extend(mock_jobs)
+                        # Fallback на реальный поиск через API
+                        real_jobs = self._real_job_search(keyword)
+                        discovered_jobs.extend(real_jobs)
                 else:
-                    # Fallback на mock если компонент недоступен
-                    mock_jobs = self._mock_job_search(keyword)
-                    discovered_jobs.extend(mock_jobs)
+                    # Fallback на реальный поиск если компонент недоступен
+                    real_jobs = self._real_job_search(keyword)
+                    discovered_jobs.extend(real_jobs)
 
             # Фильтруем дубликаты
             unique_jobs = self._filter_duplicates(discovered_jobs)
@@ -312,8 +312,8 @@ class AutoPilot:
                     self.logger.error(f"Ошибка подачи резюме через RPA: {e}")
                     success = False
             else:
-                # Fallback на mock если RPA недоступен
-                success = self._mock_job_application(job)
+                # Fallback на реальную подачу если RPA недоступен
+                success = self._real_job_application(job)
 
             if success:
                 # Записываем отклик
@@ -509,46 +509,181 @@ class AutoPilot:
         if self.on_state_change:
             self.on_state_change(self.current_state, self.state_start_time)
 
-    def _mock_job_search(self, keyword: str) -> List[JobPosting]:
-        """Моковый поиск вакансий для тестирования"""
-        companies = ["Яндекс", "Сбер", "Тинькофф", "VK", "Ozon"]
-        titles = [
-            f"Senior {keyword} Developer",
-            f"Lead {keyword} Engineer",
-            f"{keyword} Tech Lead",
-            f"Principal {keyword} Developer"
-        ]
-
+    def _real_job_search(self, keyword: str) -> List[JobPosting]:
+        """Реальный поиск вакансий через API"""
         jobs = []
-        for i in range(3):
-            job = JobPosting(
-                title=titles[i % len(titles)],
-                company=companies[i % len(companies)],
-                location="Москва",
-                salary=f"{200000 + i * 25000} - {250000 + i * 25000} руб.",
-                description=f"Вакансия для опытного {keyword} разработчика",
-                url=f"https://example.com/job/{i}",
-                source="mock",
-                posted_date=datetime.now().strftime("%Y-%m-%d")
-            )
-            jobs.append(job)
-
+        
+        try:
+            # Поиск через HeadHunter API
+            import requests
+            
+            hh_url = "https://api.hh.ru/vacancies"
+            params = {
+                "text": keyword,
+                "area": 1,  # Москва
+                "per_page": 20,
+                "only_with_salary": True
+            }
+            
+            response = requests.get(hh_url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                
+                for item in data.get('items', []):
+                    job = JobPosting(
+                        title=item.get('name', ''),
+                        company=item.get('employer', {}).get('name', ''),
+                        location=item.get('area', {}).get('name', ''),
+                        salary=self._format_hh_salary(item.get('salary')),
+                        description=item.get('snippet', {}).get('requirement', ''),
+                        url=item.get('alternate_url', ''),
+                        source="hh.ru",
+                        posted_date=item.get('published_at', '')[:10]
+                    )
+                    jobs.append(job)
+                    
+        except Exception as e:
+            self.logger.error(f"Ошибка поиска через HH API: {e}")
+            
+        try:
+            # Поиск через SuperJob API
+            sj_url = "https://api.superjob.ru/2.0/vacancies/"
+            headers = {
+                "X-Api-App-Id": os.getenv("SUPERJOB_API_KEY", "")
+            }
+            params = {
+                "keyword": keyword,
+                "town": 4,  # Москва
+                "count": 20
+            }
+            
+            if headers["X-Api-App-Id"]:
+                response = requests.get(sj_url, headers=headers, params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    for item in data.get('objects', []):
+                        job = JobPosting(
+                            title=item.get('profession', ''),
+                            company=item.get('client', {}).get('title', ''),
+                            location=item.get('town', {}).get('title', ''),
+                            salary=self._format_sj_salary(item.get('payment_from'), item.get('payment_to')),
+                            description=item.get('candidat', ''),
+                            url=item.get('link', ''),
+                            source="superjob.ru",
+                            posted_date=item.get('date_published', '')[:10]
+                        )
+                        jobs.append(job)
+                        
+        except Exception as e:
+            self.logger.error(f"Ошибка поиска через SuperJob API: {e}")
+            
         return jobs
+    
+    def _format_hh_salary(self, salary_data: dict) -> str:
+        """Форматирование зарплаты из HH API"""
+        if not salary_data:
+            return "не указана"
+            
+        from_salary = salary_data.get('from')
+        to_salary = salary_data.get('to')
+        currency = salary_data.get('currency', 'RUR')
+        
+        if from_salary and to_salary:
+            return f"{from_salary:,} - {to_salary:,} {currency}"
+        elif from_salary:
+            return f"от {from_salary:,} {currency}"
+        elif to_salary:
+            return f"до {to_salary:,} {currency}"
+        else:
+            return "не указана"
+    
+    def _format_sj_salary(self, from_salary: int, to_salary: int) -> str:
+        """Форматирование зарплаты из SuperJob API"""
+        if from_salary and to_salary:
+            return f"{from_salary:,} - {to_salary:,} руб."
+        elif from_salary:
+            return f"от {from_salary:,} руб."
+        elif to_salary:
+            return f"до {to_salary:,} руб."
+        else:
+            return "не указана"
 
-    def _mock_job_application(self, job: JobPosting) -> bool:
-        """Моковая подача резюме"""
-        # Имитируем успех в 80% случаев
-        import random
-        success = random.random() < 0.8
-
-        if success:
-            # Иногда сразу назначаем интервью
-            if random.random() < 0.3:
-                # Имитируем интервью через неделю
-                interview_date = datetime.now() + timedelta(days=7)
-                self._schedule_mock_interview(job, interview_date)
-
-        return success
+    def _real_job_application(self, job: JobPosting) -> bool:
+        """Реальная подача резюме через RPA"""
+        try:
+            if self.browser_rpa:
+                # Используем реальный RPA для подачи резюме
+                success = self.browser_rpa.apply_for_job(job)
+                
+                if success:
+                    # Проверяем, назначили ли интервью
+                    interview_date = self.browser_rpa.check_for_interview_schedule(job)
+                    if interview_date:
+                        self._schedule_real_interview(job, interview_date)
+                
+                return success
+            else:
+                # Fallback на простую отправку email
+                return self._send_application_email(job)
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка подачи резюме: {e}")
+            return False
+    
+    def _send_application_email(self, job: JobPosting) -> bool:
+        """Отправка заявки по email"""
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            
+            # Получаем настройки email из переменных окружения
+            smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
+            email = os.getenv("EMAIL_ADDRESS")
+            password = os.getenv("EMAIL_PASSWORD")
+            
+            if not email or not password:
+                self.logger.error("Email настройки не найдены")
+                return False
+            
+            # Создаем письмо
+            msg = MIMEMultipart()
+            msg['From'] = email
+            msg['To'] = job.company  # Упрощенно
+            msg['Subject'] = f"Отклик на вакансию: {job.title}"
+            
+            body = f"""
+            Здравствуйте!
+            
+            Меня заинтересовала вакансия "{job.title}" в компании {job.company}.
+            
+            Мой опыт:
+            - 7+ лет разработки на Python
+            - Опыт с ML/AI проектами
+            - Знание современных фреймворков
+            
+            Готов обсудить детали.
+            
+            С уважением,
+            МАГИСТР
+            """
+            
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            
+            # Отправляем
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(email, password)
+            server.send_message(msg)
+            server.quit()
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка отправки email: {e}")
+            return False
 
     def _schedule_mock_interview(self, job: JobPosting, interview_date: datetime):
         """Планирование мокового интервью"""

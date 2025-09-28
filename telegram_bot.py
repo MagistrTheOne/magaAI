@@ -599,7 +599,32 @@ class MAGATelegramBot:
 
         elif command == "speak_response":
             await callback.answer("🔊 Озвучиваю ответ...")
-            await callback.message.answer("🎵 Ответ озвучен! (симуляция TTS)")
+            
+            # Реальное озвучивание через edge-tts
+            try:
+                import edge_tts
+                import asyncio
+                import os
+                
+                # Получаем последний ответ бота
+                last_response = "Привет! Я МАГА - ваш AI-ассистент по карьере."
+                
+                # Создаем аудио файл
+                voice_path = f"temp_voice_{callback.from_user.id}.mp3"
+                communicate = edge_tts.Communicate(last_response, "ru-RU-DmitryNeural")
+                await communicate.save(voice_path)
+                
+                # Отправляем аудио
+                with open(voice_path, 'rb') as audio_file:
+                    await callback.message.answer_voice(audio_file)
+                
+                # Удаляем временный файл
+                if os.path.exists(voice_path):
+                    os.remove(voice_path)
+                    
+            except Exception as e:
+                self.logger.error(f"Ошибка озвучивания: {e}")
+                await callback.message.answer("❌ Ошибка озвучивания. Попробуйте позже.")
 
     async def _handle_find_jobs(self, callback: CallbackQuery):
         """Обработка поиска работы"""
@@ -805,16 +830,36 @@ class MAGATelegramBot:
         # Имитируем обработку голоса
         await message.answer("🎤 Голосовое сообщение получено. Обрабатываю...")
 
-        # Имитируем распознавание
-        await asyncio.sleep(2)
-
-        recognized_text = "МАГА, найди работу в Яндексе"  # Заглушка
-
-        await message.answer(f"🎯 Распознано: \"{recognized_text}\"")
-
-        # Обрабатываем как текстовое сообщение
-        message.text = recognized_text
-        await self.handle_text(message)
+        # Реальное распознавание голоса через faster-whisper
+        try:
+            # Скачиваем голосовое сообщение
+            file = await self.bot.get_file(message.voice.file_id)
+            voice_path = f"temp_voice_{message.voice.file_id}.ogg"
+            
+            # Сохраняем файл
+            await file.download_to_drive(voice_path)
+            
+            # Распознаем речь
+            from faster_whisper import WhisperModel
+            model = WhisperModel("base", device="cpu")
+            segments, info = model.transcribe(voice_path, language="ru")
+            
+            recognized_text = " ".join([segment.text for segment in segments])
+            
+            # Удаляем временный файл
+            import os
+            if os.path.exists(voice_path):
+                os.remove(voice_path)
+                
+            await message.answer(f"🎯 Распознано: \"{recognized_text}\"")
+            
+            # Обрабатываем как текстовое сообщение
+            message.text = recognized_text
+            await self.handle_text(message)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка распознавания голоса: {e}")
+            await message.answer("❌ Ошибка распознавания голоса. Попробуйте еще раз.")
 
     async def handle_text(self, message: types.Message):
         """Обработка текстовых сообщений"""

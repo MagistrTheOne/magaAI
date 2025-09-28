@@ -10,8 +10,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram_bot import MAGATelegramBot
 
 # Устанавливаем headless режим для Railway
-os.environ['HEADLESS'] = '1'
-os.environ['DISPLAY'] = ''
+os.environ['HEADLESS'] = os.getenv('HEADLESS', '1')
+os.environ['DISPLAY'] = os.getenv('DISPLAY', '')
+
+# Получаем порт из Railway или используем 8000 по умолчанию
+PORT = int(os.getenv('PORT', 8000))
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for health checks"""
@@ -37,8 +40,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
 def run_health_server():
     """Run simple health check server in background"""
-    server = HTTPServer(('0.0.0.0', 8000), HealthCheckHandler)
-    print("🏥 Health check server started on port 8000")
+    server = HTTPServer(('0.0.0.0', PORT), HealthCheckHandler)
+    print(f"🏥 Health check server started on port {PORT}")
 
     # Run server in background thread
     import threading
@@ -59,7 +62,7 @@ async def main():
         bot = MAGATelegramBot()
         print("✅ MAGA AI initialized successfully")
         print("🤖 Telegram bot ready")
-        print("🔗 Health check available at http://0.0.0.0:8000/health")
+        print(f"🔗 Health check available at http://0.0.0.0:{PORT}/health")
 
         # Run the bot
         await bot.run()

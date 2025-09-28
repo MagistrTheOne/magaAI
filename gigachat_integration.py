@@ -25,10 +25,30 @@ class GigaChatAPI:
         Аутентификация в GigaChat API
         """
         try:
-            # TODO: Реальная аутентификация с API
             print("🔐 Аутентификация в GigaChat API...")
-            # self.access_token = self._get_access_token()
-            return True
+            
+            # Получаем токен доступа
+            auth_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+            auth_data = {
+                "scope": "GIGACHAT_API_PERS"
+            }
+            
+            response = requests.post(
+                auth_url,
+                data=auth_data,
+                auth=(self.api_key, ""),
+                verify=False  # Для тестирования
+            )
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                self.access_token = token_data.get('access_token')
+                print("✅ Аутентификация успешна")
+                return True
+            else:
+                print(f"❌ Ошибка аутентификации: {response.status_code}")
+                return False
+                
         except Exception as e:
             print(f"❌ Ошибка аутентификации: {e}")
             return False
@@ -38,15 +58,62 @@ class GigaChatAPI:
         Генерация ответа через GigaChat
         """
         try:
-            # TODO: Реальный запрос к API
-            # response = self._make_api_request(prompt, context)
+            if not self.access_token:
+                if not self.authenticate():
+                    return "Ошибка аутентификации с GigaChat API"
             
-            # Временная заглушка для тестирования
-            return self._generate_mock_response(prompt, context)
+            # Реальный запрос к API
+            response = self._make_api_request(prompt, context)
+            return response
             
         except Exception as e:
             print(f"❌ Ошибка генерации ответа: {e}")
-            return "Извините, произошла ошибка."
+            # Fallback на mock если API недоступен
+            return self._generate_mock_response(prompt, context)
+    
+    def _make_api_request(self, prompt: str, context: Dict = None) -> str:
+        """
+        Реальный запрос к GigaChat API
+        """
+        try:
+            url = f"{self.base_url}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Формируем сообщения для API
+            messages = []
+            if context:
+                messages.append({
+                    "role": "system",
+                    "content": f"Контекст: {context}"
+                })
+            
+            messages.append({
+                "role": "user", 
+                "content": prompt
+            })
+            
+            data = {
+                "model": "GigaChat:latest",
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 1000
+            }
+            
+            response = requests.post(url, headers=headers, json=data, verify=False)
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result['choices'][0]['message']['content']
+            else:
+                print(f"❌ Ошибка API: {response.status_code}")
+                return "Ошибка API GigaChat"
+                
+        except Exception as e:
+            print(f"❌ Ошибка запроса к API: {e}")
+            return "Ошибка соединения с GigaChat"
     
     def _generate_mock_response(self, prompt: str, context: Dict = None) -> str:
         """

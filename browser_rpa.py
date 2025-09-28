@@ -383,9 +383,10 @@ class BrowserRPA:
 
             # Заполняем поля
             try:
-                # Phone number
+                # Phone number - получаем из конфигурации
                 phone_input = self.page.locator("input[type='tel']")
-                await phone_input.fill("+79991234567")  # Заглушка
+                phone_number = self.config.get('phone_number', '+79884135937')
+                await phone_input.fill(phone_number)
 
                 # Cover letter
                 cover_textarea = self.page.locator("textarea").first
@@ -468,29 +469,29 @@ class BrowserRPA:
         name_lower = name.lower()
         placeholder_lower = placeholder.lower()
 
-        # Email
+        # Email - получаем из конфигурации
         if "email" in name_lower or "email" in placeholder_lower:
-            return form_data.get("email", "candidate@example.com")
+            return form_data.get("email", self.config.get('email', 'maxonyushko71@gmail.com'))
 
-        # Phone
+        # Phone - получаем из конфигурации
         if "phone" in name_lower or "телефон" in placeholder_lower:
-            return form_data.get("phone", "+79991234567")
+            return form_data.get("phone", self.config.get('phone', '+79991234567'))
 
-        # Name
+        # Name - получаем из конфигурации
         if "name" in name_lower or "имя" in placeholder_lower:
-            return form_data.get("name", "Максим Онюшко")
+            return form_data.get("name", self.config.get('name', 'Максим Онюшко'))
 
         # LinkedIn
         if "linkedin" in name_lower:
-            return form_data.get("linkedin_url")
+            return form_data.get("https://www.linkedin.com/in/magistrtheone/")
 
         # GitHub
         if "github" in name_lower:
-            return form_data.get("github_url")
+            return form_data.get("https://github.com/MagistrTheOne")
 
         # Portfolio
         if "portfolio" in name_lower:
-            return form_data.get("portfolio_url")
+            return form_data.get("https://magistrtheone.vercel.app/")
 
         return None
 
