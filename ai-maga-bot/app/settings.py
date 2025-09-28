@@ -3,7 +3,7 @@
 """
 import os
 import logging
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseSettings, Field, validator
 
 
@@ -36,6 +36,34 @@ class Settings(BaseSettings):
     elevenlabs_model_id: str = Field(default="eleven_multilingual_v2", description="Модель ElevenLabs")
     elevenlabs_output_format: str = Field(default="mp3_44100_128", description="Формат аудио ElevenLabs")
     elevenlabs_convert_to_ogg: bool = Field(default=False, description="Конвертировать в OGG/OPUS")
+
+    # Zoom (Server-to-Server OAuth + Webhooks)
+    zoom_account_id: Optional[str] = Field(default=None, description="Zoom Account ID (S2S OAuth)")
+    zoom_client_id: Optional[str] = Field(default=None, description="Zoom Client ID (S2S OAuth)")
+    zoom_client_secret: Optional[str] = Field(default=None, description="Zoom Client Secret (S2S OAuth)")
+    zoom_default_user: Optional[str] = Field(default="me", description="Zoom userId/email для операций по умолчанию")
+    zoom_webhook_secret: Optional[str] = Field(default=None, description="Секрет подписи вебхуков Zoom")
+    
+    # OS Control
+    os_control_enabled: bool = Field(default=False, description="Включить OS контроль")
+    os_whitelist_commands: List[str] = Field(default_factory=lambda: [
+        "ls", "dir", "pwd", "cd", "mkdir", "rmdir", "cp", "mv", "cat", "head", "tail",
+        "ps", "top", "df", "du", "free", "uptime", "whoami", "date", "echo"
+    ], description="Whitelist разрешенных OS команд")
+    
+    # Voice Control
+    voice_control_enabled: bool = Field(default=False, description="Включить голосовое управление")
+    voice_wake_word: str = Field(default="Hey AI-Maga", description="Wake word для активации")
+    voice_confidence_threshold: float = Field(default=0.6, description="Минимальная уверенность распознавания")
+    
+    # Autonomous Mode
+    autonomous_mode_enabled: bool = Field(default=False, description="Включить автономный режим")
+    autonomous_check_interval: int = Field(default=300, description="Интервал проверки автономных задач (секунды)")
+    
+    # Advanced AI
+    memory_enabled: bool = Field(default=False, description="Включить память и RAG")
+    vision_enabled: bool = Field(default=False, description="Включить Vision обработку")
+    ai_decision_profile: str = Field(default="balanced", description="Профиль принятия решений (conservative/balanced/active)")
     
     # Server
     port: int = Field(default=8080, description="Порт сервера")
@@ -97,6 +125,28 @@ class Settings(BaseSettings):
         model_uri = values.get("yandex_model_uri")
         if model_uri:
             return model_uri
+        return v
+    
+    @validator("ai_decision_profile")
+    def validate_ai_decision_profile(cls, v):
+        """Валидируем профиль принятия решений."""
+        valid_profiles = ["conservative", "balanced", "active"]
+        if v.lower() not in valid_profiles:
+            raise ValueError(f"ai_decision_profile должен быть одним из: {valid_profiles}")
+        return v.lower()
+    
+    @validator("voice_confidence_threshold")
+    def validate_voice_confidence(cls, v):
+        """Валидируем порог уверенности голоса."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("voice_confidence_threshold должен быть между 0.0 и 1.0")
+        return v
+    
+    @validator("autonomous_check_interval")
+    def validate_autonomous_interval(cls, v):
+        """Валидируем интервал автономных задач."""
+        if v < 60:
+            raise ValueError("autonomous_check_interval должен быть не менее 60 секунд")
         return v
 
 

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class YandexSTTError(Exception):
     """Ошибка при работе с Yandex STT."""
+    """Yandex SpeechKit STT провайдер."""
     pass
 
 

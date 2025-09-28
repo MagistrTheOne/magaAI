@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ElevenLabsTTSError(Exception):
     """Ошибка при работе с ElevenLabs TTS."""
+    """ElevenLabs TTS провайдер."""
     pass
 
 

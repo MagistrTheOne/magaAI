@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class YandexLLMError(Exception):
     """Ошибка при работе с Yandex LLM."""
+    """Yandex Foundation Models LLM провайдер."""
     pass
 
 

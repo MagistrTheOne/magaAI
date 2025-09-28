@@ -160,6 +160,49 @@ async def webhook_guard_middleware(request: Request, call_next):
         )
 
 
+def validate_zoom_webhook_signature(request: Request) -> bool:
+    """
+    Валидировать подпись Zoom webhook.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        bool: True если подпись валидна
+    """
+    import hmac
+    import hashlib
+    
+    if not settings.zoom_webhook_secret:
+        logger.warning("Zoom webhook secret не настроен")
+        return False
+    
+    # Получаем подпись из заголовка
+    signature = request.headers.get("X-Zm-Signature")
+    if not signature:
+        logger.warning("Отсутствует подпись Zoom webhook")
+        return False
+    
+    # Получаем timestamp
+    timestamp = request.headers.get("X-Zm-Request-Timestamp")
+    if not timestamp:
+        logger.warning("Отсутствует timestamp Zoom webhook")
+        return False
+    
+    # Получаем тело запроса
+    body = request.body
+    if not body:
+        logger.warning("Пустое тело Zoom webhook")
+        return False
+    
+    # Создаем подпись для проверки
+    message = f"v0:{timestamp}:{body.decode()}"
+    expected_signature = f"v0={hmac.new(settings.zoom_webhook_secret.encode(), message.encode(), hashlib.sha256).hexdigest()}"
+    
+    # Сравниваем подписи
+    return hmac.compare_digest(signature, expected_signature)
+
+
 def validate_webhook_request(secret: str, request: Request) -> None:
     """
     Валидировать запрос webhook.
@@ -179,6 +222,28 @@ def validate_webhook_request(secret: str, request: Request) -> None:
     # Проверяем токен Telegram
     if not validate_telegram_token(request):
         logger.warning("Неверный токен Telegram")
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    # Проверяем rate limit
+    client_ip = get_client_ip(request)
+    if not rate_limiter.is_allowed(client_ip):
+        logger.warning(f"Rate limit превышен для IP {client_ip}")
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+
+
+def validate_zoom_webhook_request(request: Request) -> None:
+    """
+    Валидировать запрос Zoom webhook.
+    
+    Args:
+        request: HTTP запрос
+        
+    Raises:
+        HTTPException: При невалидном запросе
+    """
+    # Проверяем подпись Zoom
+    if not validate_zoom_webhook_signature(request):
+        logger.warning("Неверная подпись Zoom webhook")
         raise HTTPException(status_code=403, detail="Forbidden")
     
     # Проверяем rate limit

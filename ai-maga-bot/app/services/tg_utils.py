@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class TelegramError(Exception):
     """Ошибка при работе с Telegram API."""
+    """Вспомогательные функции для работы с Telegram."""
     pass
 
 
@@ -217,7 +218,7 @@ async def send_error_message(
         return await send_text_message(
             bot=bot,
             chat_id=chat_id,
-            text=f"❌ {error_text}",
+            text=f"{error_text}",
             reply_to_message_id=reply_to_message_id
         )
     except Exception as e:

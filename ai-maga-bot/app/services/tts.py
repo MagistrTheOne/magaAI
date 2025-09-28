@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class TTSProviderError(Exception):
     """Ошибка TTS провайдера."""
+    """Фасад для TTS провайдеров."""
     pass
 
 
