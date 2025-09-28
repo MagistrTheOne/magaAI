@@ -6,6 +6,9 @@ startCommand = "python telegram_bot_v3.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
+
+[environments.production]
+variables = { PORT = "8000", PYTHONUNBUFFERED = "1", HEADLESS = "1" }
 restartPolicyMaxRetries = 10
 
 [build.dockerfile]

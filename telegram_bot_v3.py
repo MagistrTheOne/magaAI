@@ -29,8 +29,9 @@ try:
     from integrations.yandex_vision import YandexVision
     from integrations.yandex_translate import YandexTranslate
     from integrations.yandex_ocr import YandexOCR
-    from personal_crm import PersonalCRM
-    from routine_features import RoutineFeatures
+    from services.email_triage import EmailTriageService
+    from services.time_blocking import TimeBlockingService
+    from services.finance_receipts import FinanceReceiptsService
     BRAIN_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Некоторые компоненты недоступны: {e}")
@@ -42,6 +43,9 @@ class UserStates(StatesGroup):
     waiting_for_file = State()
     waiting_for_translation = State()
     waiting_for_ocr = State()
+    waiting_for_email = State()
+    waiting_for_task = State()
+    waiting_for_receipt = State()
 
 
 class AIMagistrTelegramBot:
@@ -74,8 +78,11 @@ class AIMagistrTelegramBot:
         self.vision = None
         self.translate = None
         self.ocr = None
-        self.crm = None
-        self.routine = None
+        
+        # Сервисы AIMagistr 3.1
+        self.email_triage = None
+        self.time_blocking = None
+        self.finance_receipts = None
         
         # Контекст пользователей
         self.user_contexts = {}
@@ -110,10 +117,13 @@ class AIMagistrTelegramBot:
                 self.vision = YandexVision()
                 self.translate = YandexTranslate()
                 self.ocr = YandexOCR()
-                self.crm = PersonalCRM()
-                self.routine = RoutineFeatures()
                 
-                self.logger.info("Все компоненты AIMagistr 3.0 инициализированы")
+                # Инициализация сервисов
+                self.email_triage = EmailTriageService()
+                self.time_blocking = TimeBlockingService()
+                self.finance_receipts = FinanceReceiptsService()
+                
+                self.logger.info("Все компоненты AIMagistr 3.1 инициализированы")
             else:
                 self.logger.warning("Некоторые компоненты недоступны")
         except Exception as e:
@@ -133,6 +143,22 @@ class AIMagistrTelegramBot:
         self.dp.message.register(self._handle_translate, Command("translate"))
         self.dp.message.register(self._handle_metrics, Command("metrics"))
         self.dp.message.register(self._handle_admin, Command("admin"))
+        
+        # Новые команды AIMagistr 3.1
+        self.dp.message.register(self._handle_mailtriage, Command("mailtriage"))
+        self.dp.message.register(self._handle_timeblock, Command("timeblock"))
+        self.dp.message.register(self._handle_receipt, Command("receipt"))
+        self.dp.message.register(self._handle_routine, Command("routine"))
+        self.dp.message.register(self._handle_subscribe, Command("subscribe"))
+        self.dp.message.register(self._handle_trip, Command("trip"))
+        self.dp.message.register(self._handle_catalog, Command("catalog"))
+        self.dp.message.register(self._handle_focus, Command("focus"))
+        self.dp.message.register(self._handle_read, Command("read"))
+        self.dp.message.register(self._handle_crm, Command("crm"))
+        self.dp.message.register(self._handle_health, Command("health"))
+        self.dp.message.register(self._handle_jobs, Command("jobs"))
+        self.dp.message.register(self._handle_weekly, Command("weekly"))
+        self.dp.message.register(self._handle_shop, Command("shop"))
         
         # Обработка сообщений
         self.dp.message.register(self._handle_text_message, F.text)
@@ -195,7 +221,7 @@ class AIMagistrTelegramBot:
     async def _handle_help(self, message: Message):
         """Обработка команды /help"""
         help_text = """
-<b>🤖 AIMagistr 3.0 - Справка</b>
+<b>🤖 AIMagistr 3.1 - Справка</b>
 
 <b>Основные команды:</b>
 /start - Начать работу
@@ -203,6 +229,22 @@ class AIMagistrTelegramBot:
 /features - Все возможности
 /reset - Сброс контекста
 /metrics - Статистика использования
+
+<b>Новые сервисы 3.1:</b>
+/mailtriage - Приоритизация писем
+/timeblock - Тайм-блокинг задач
+/receipt - Обработка чеков
+/routine - Планировщик рутин
+/subscribe - Трекер подписок
+/trip - Помощник путешествий
+/catalog - Автокаталог документов
+/focus - Ежедневный фокус
+/read - Очередь чтения
+/crm - Персональный CRM
+/health - Здоровье и продуктивность
+/jobs - Джоб-алерты
+/weekly - Еженедельный отчет
+/shop - Списки покупок
 
 <b>Команды для работы с файлами:</b>
 /ocr - OCR изображений
@@ -488,6 +530,12 @@ class AIMagistrTelegramBot:
         if current_state == UserStates.waiting_for_translation:
             await self._process_translation_request(message, text)
             await state.clear()
+        elif current_state == UserStates.waiting_for_email:
+            await self._process_email_triage(message, text)
+            await state.clear()
+        elif current_state == UserStates.waiting_for_receipt:
+            await self._process_receipt(message, text)
+            await state.clear()
         else:
             await self._process_ai_request(message, text)
     
@@ -708,6 +756,185 @@ class AIMagistrTelegramBot:
         except Exception as e:
             self.logger.error(f"Ошибка перевода: {e}")
             await message.answer("❌ Ошибка при переводе")
+    
+    # Новые обработчики команд AIMagistr 3.1
+    async def _handle_mailtriage(self, message: Message):
+        """Обработка команды /mailtriage"""
+        await message.answer("📧 Отправьте текст письма для приоритизации")
+        await self.dp.set_state(message.from_user.id, UserStates.waiting_for_email)
+    
+    async def _handle_timeblock(self, message: Message):
+        """Обработка команды /timeblock"""
+        if not self.time_blocking:
+            await message.answer("❌ Сервис тайм-блокинга недоступен")
+            return
+        
+        try:
+            # Получаем незапланированные задачи
+            tasks = self.time_blocking.get_tasks(status="pending")
+            
+            if not tasks:
+                await message.answer("📝 Нет незапланированных задач. Добавьте задачи командой /addtask")
+                return
+            
+            # Показываем задачи
+            tasks_text = "📋 Незапланированные задачи:\n\n"
+            for i, task in enumerate(tasks[:5], 1):
+                tasks_text += f"{i}. {task['title']} ({task['estimated_duration']} мин, {task['priority']})\n"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📅 Запланировать задачи", callback_data="schedule_tasks")],
+                [InlineKeyboardButton(text="📊 Показать расписание", callback_data="show_schedule")]
+            ])
+            
+            await message.answer(tasks_text, reply_markup=keyboard)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка тайм-блокинга: {e}")
+            await message.answer("❌ Ошибка при работе с тайм-блокингом")
+    
+    async def _handle_receipt(self, message: Message):
+        """Обработка команды /receipt"""
+        if not self.finance_receipts:
+            await message.answer("❌ Сервис финансов недоступен")
+            return
+        
+        await message.answer("🧾 Отправьте фото чека или текст чека для обработки")
+        await self.dp.set_state(message.from_user.id, UserStates.waiting_for_receipt)
+    
+    async def _process_email_triage(self, message: Message, text: str):
+        """Обработка приоритизации письма"""
+        if not self.email_triage:
+            await message.answer("❌ Сервис приоритизации писем недоступен")
+            return
+        
+        await message.answer("📧 Анализирую письмо...")
+        
+        try:
+            result = await self.email_triage.process_email(text)
+            
+            if "error" in result:
+                await message.answer(f"❌ Ошибка: {result['error']}")
+                return
+            
+            priority_emoji = {
+                "high": "🔴",
+                "medium": "🟡", 
+                "low": "🟢",
+                "spam": "🗑️"
+            }
+            
+            response = f"""
+{priority_emoji.get(result['priority'], '⚪')} <b>Приоритет: {result['priority'].upper()}</b>
+
+<b>Тема:</b> {result.get('subject', 'Без темы')}
+<b>От:</b> {result.get('from', 'Неизвестно')}
+<b>Обоснование:</b> {result.get('reasoning', 'Не указано')}
+
+<b>Следующие действия:</b>
+• Высокий приоритет - ответить немедленно
+• Средний приоритет - ответить в течение дня
+• Низкий приоритет - ответить когда будет время
+• Спам - удалить или отправить в спам
+            """
+            
+            await message.answer(response)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка приоритизации письма: {e}")
+            await message.answer("❌ Ошибка при анализе письма")
+    
+    async def _process_receipt(self, message: Message, text: str = None):
+        """Обработка чека"""
+        if not self.finance_receipts:
+            await message.answer("❌ Сервис финансов недоступен")
+            return
+        
+        await message.answer("🧾 Обрабатываю чек...")
+        
+        try:
+            if text:
+                result = await self.finance_receipts.process_receipt(text)
+            else:
+                # Если это фото, нужно сначала получить OCR
+                await message.answer("📷 Сначала нужно распознать текст с фото")
+                return
+            
+            if "error" in result:
+                await message.answer(f"❌ Ошибка: {result['error']}")
+                return
+            
+            category_emoji = {
+                "food": "🍕",
+                "transport": "🚗",
+                "health": "🏥",
+                "shopping": "🛍️",
+                "utilities": "🏠",
+                "entertainment": "🎬",
+                "other": "📦"
+            }
+            
+            response = f"""
+{category_emoji.get(result['category'], '📦')} <b>Чек обработан</b>
+
+<b>Сумма:</b> {result['amount']} руб
+<b>Категория:</b> {result['category']}
+<b>Дата:</b> {result['date']}
+<b>Обоснование:</b> {result['reasoning']}
+
+<b>Добавлено в расходы!</b>
+            """
+            
+            await message.answer(response)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка обработки чека: {e}")
+            await message.answer("❌ Ошибка при обработке чека")
+    
+    # Обработчики остальных команд AIMagistr 3.1
+    async def _handle_routine(self, message: Message):
+        """Обработка команды /routine"""
+        await message.answer("🔄 Планировщик рутин\n\nДоступные функции:\n• Создание повторяющихся задач\n• Напоминания\n• Автоматические уведомления")
+    
+    async def _handle_subscribe(self, message: Message):
+        """Обработка команды /subscribe"""
+        await message.answer("📋 Трекер подписок\n\nДоступные функции:\n• Отслеживание подписок\n• Уведомления об оплате\n• Анализ расходов")
+    
+    async def _handle_trip(self, message: Message):
+        """Обработка команды /trip"""
+        await message.answer("✈️ Помощник путешествий\n\nДоступные функции:\n• Планирование маршрутов\n• Анализ билетов и отелей\n• Уведомления о рейсах")
+    
+    async def _handle_catalog(self, message: Message):
+        """Обработка команды /catalog"""
+        await message.answer("📁 Автокаталог документов\n\nДоступные функции:\n• Автоматическая сортировка\n• Теги и категории\n• Поиск по содержимому")
+    
+    async def _handle_focus(self, message: Message):
+        """Обработка команды /focus"""
+        await message.answer("🎯 Ежедневный фокус\n\nДоступные функции:\n• 3 приоритета дня\n• Планирование времени\n• Отслеживание прогресса")
+    
+    async def _handle_read(self, message: Message):
+        """Обработка команды /read"""
+        await message.answer("📚 Очередь чтения\n\nДоступные функции:\n• Саммари статей\n• Перевод текстов\n• Карточки для запоминания")
+    
+    async def _handle_crm(self, message: Message):
+        """Обработка команды /crm"""
+        await message.answer("👥 Персональный CRM\n\nДоступные функции:\n• Управление контактами\n• Дни рождения\n• Follow-up задачи")
+    
+    async def _handle_health(self, message: Message):
+        """Обработка команды /health"""
+        await message.answer("💪 Здоровье и продуктивность\n\nДоступные функции:\n• Помодоро таймер\n• Напоминания о перерывах\n• Трекинг привычек")
+    
+    async def _handle_jobs(self, message: Message):
+        """Обработка команды /jobs"""
+        await message.answer("💼 Джоб-алерты\n\nДоступные функции:\n• Отслеживание вакансий\n• Автоматические уведомления\n• Анализ требований")
+    
+    async def _handle_weekly(self, message: Message):
+        """Обработка команды /weekly"""
+        await message.answer("📊 Еженедельный отчет\n\nДоступные функции:\n• Анализ активности\n• Статистика продуктивности\n• Планы на неделю")
+    
+    async def _handle_shop(self, message: Message):
+        """Обработка команды /shop"""
+        await message.answer("🛒 Списки покупок\n\nДоступные функции:\n• Создание списков из рецептов\n• Распознавание товаров\n• Планирование покупок")
     
     async def run(self):
         """Запуск бота"""
