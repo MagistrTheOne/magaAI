@@ -149,20 +149,25 @@ class AutoPilot:
 
     def _run_autopilot(self):
         """Основной цикл Auto-Pilot"""
+        # Создаем event loop для async операций
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         while self.is_running:
             try:
                 if self.current_state == AutoPilotState.DISCOVER:
-                    self._state_discover()
+                    loop.run_until_complete(self._state_discover())
                 elif self.current_state == AutoPilotState.FILTER:
                     self._state_filter()
                 elif self.current_state == AutoPilotState.APPLY:
-                    self._state_apply()
+                    loop.run_until_complete(self._state_apply())
                 elif self.current_state == AutoPilotState.FOLLOW_UP:
                     self._state_follow_up()
                 elif self.current_state == AutoPilotState.INTERVIEW:
                     self._state_interview()
                 elif self.current_state == AutoPilotState.NEGOTIATE:
-                    self._state_negotiate()
+                    loop.run_until_complete(self._state_negotiate())
                 elif self.current_state == AutoPilotState.CLOSE:
                     self._state_close()
                 elif self.current_state == AutoPilotState.PAUSED:
@@ -178,7 +183,7 @@ class AutoPilot:
                 self._notify_state_change()
                 time.sleep(5)  # Задержка перед повтором
 
-    def _state_discover(self):
+    async def _state_discover(self):
         """Состояние: поиск вакансий"""
         try:
             self.logger.info("🔍 Starting job discovery...")
@@ -283,7 +288,7 @@ class AutoPilot:
         except Exception as e:
             self.logger.error(f"Filter failed: {e}")
 
-    def _state_apply(self):
+    async def _state_apply(self):
         """Состояние: подача резюме"""
         try:
             if not self.discovered_jobs:
@@ -298,10 +303,9 @@ class AutoPilot:
             if self.browser_rpa:
                 try:
                     application_data = ApplicationData(
-                        job_url=job.url,
                         resume_path=self.config.resume_path,
                         cover_letter=self._generate_cover_letter(job),
-                        auto_submit=True
+                        job_url=job.url
                     )
                     success = await self.browser_rpa.apply_to_job(application_data)
                 except Exception as e:
@@ -408,7 +412,7 @@ class AutoPilot:
         except Exception as e:
             self.logger.error(f"Interview preparation failed: {e}")
 
-    def _state_negotiate(self):
+    async def _state_negotiate(self):
         """Состояние: переговоры"""
         try:
             self.logger.info("💼 Starting negotiations...")

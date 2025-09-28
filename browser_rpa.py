@@ -35,9 +35,10 @@ class ApplicationData:
     """Данные для отклика"""
     resume_path: str
     cover_letter: str
-    portfolio_url: Optional[str]
-    linkedin_url: Optional[str]
-    github_url: Optional[str]
+    job_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
 
 
 class BrowserRPA:
@@ -410,6 +411,23 @@ class BrowserRPA:
 
         except Exception as e:
             self.logger.error(f"LinkedIn application failed: {e}")
+            return False
+
+    async def apply_to_job(self, application_data: ApplicationData) -> bool:
+        """Общий метод подачи резюме"""
+        job_url = application_data.job_url if hasattr(application_data, 'job_url') else getattr(application_data, 'url', '')
+
+        if not job_url:
+            self.logger.error("No job URL provided")
+            return False
+
+        # Определяем платформу по URL
+        if "hh.ru" in job_url:
+            return await self.apply_to_job_hh(job_url, application_data)
+        elif "linkedin.com" in job_url:
+            return await self.apply_to_job_linkedin(job_url, application_data)
+        else:
+            self.logger.warning(f"Unsupported job platform for URL: {job_url}")
             return False
 
     async def fill_job_application_form(self, form_data: Dict[str, Any]) -> bool:
