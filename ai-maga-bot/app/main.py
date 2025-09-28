@@ -5,18 +5,18 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 from app.settings import settings
 from app.schemas import HealthResponse
 from app.router import dp, bot, set_webhook, close_bot
 from app.middleware.webhook_guard import validate_webhook_request
+from app.observability.metrics import get_metrics_response, get_metrics_summary
+from app.observability.logging import setup_logging, app_logger
 
-# Setup logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Setup structured logging
+setup_logging(settings.log_level)
+logger = app_logger
 
 
 @asynccontextmanager
@@ -55,6 +55,48 @@ app.add_middleware(
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(status="ok")
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return get_metrics_response()
+
+
+@app.get("/readyz")
+async def readiness_check():
+    """Readiness check endpoint."""
+    try:
+        # Check external dependencies
+        # For now, just return OK - in production, check Yandex API connectivity
+        return {"status": "ready", "dependencies": {"yandex_api": "ok"}}
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service not ready")
+
+
+@app.get("/services")
+async def services_status():
+    """Services status endpoint."""
+    return {
+        "services": {
+            "telegram_bot": "running",
+            "yandex_llm": "available",
+            "yandex_tts": "available",
+            "yandex_stt": "available" if settings.yandex_stt_enable else "disabled"
+        },
+        "metrics": get_metrics_summary()
+    }
+
+
+@app.get("/version")
+async def version():
+    """Version endpoint."""
+    return {
+        "version": "1.0.0",
+        "build": os.getenv("BUILD_ID", "unknown"),
+        "environment": os.getenv("ENVIRONMENT", "development")
+    }
 
 
 @app.post("/webhook/telegram/{secret}")

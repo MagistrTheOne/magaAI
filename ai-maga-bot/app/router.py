@@ -13,6 +13,11 @@ from app.services.yandex_tts import synthesize_speech
 from app.services.yandex_stt import recognize_speech
 from app.services.tg_utils import send_text_message, send_voice_message, download_voice_file, send_error_message
 from app.schemas import UserMode
+from app.commands.ux_commands import (
+    handle_summary_command, handle_translate_command, handle_help_command,
+    handle_help_callback, handle_help_back_callback
+)
+from app.observability.logging import app_logger
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -50,26 +55,19 @@ async def start_handler(message: Message) -> None:
 @router.message(Command("help"))
 async def help_handler(message: Message) -> None:
     """Handle /help command."""
-    help_text = (
-        "🤖 AI-Мага - ваш умный помощник\n\n"
-        "📝 Режимы ответа:\n"
-        "• auto - автоматический (голос → голос, текст → текст)\n"
-        "• text - всегда текст\n"
-        "• voice - всегда голос\n\n"
-        "🎯 Использование:\n"
-        "• Отправьте текст - получите ответ\n"
-        "• Отправьте голосовое - получите голосовой ответ\n"
-        "• В тексте укажите 🔊 или 'voice' для голосового ответа\n\n"
-        "⚙️ Команды:\n"
-        "/start - начать работу\n"
-        "/mode [auto|text|voice] - переключить режим\n"
-        "/help - эта справка"
-    )
+    await handle_help_command(message, bot, None)
 
-    try:
-        await send_text_message(bot, message.chat.id, help_text)
-    except Exception as e:
-        logger.error(f"Failed to send help message: {e}")
+
+@router.message(Command("summary"))
+async def summary_handler(message: Message) -> None:
+    """Handle /summary command."""
+    await handle_summary_command(message, bot, None)
+
+
+@router.message(Command("translate"))
+async def translate_handler(message: Message) -> None:
+    """Handle /translate command."""
+    await handle_translate_command(message, bot, None)
 
 
 @router.message(Command("mode"))

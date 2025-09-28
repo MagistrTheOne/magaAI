@@ -1,8 +1,12 @@
 """Yandex LLM service using Foundation Models API."""
 
 import httpx
+import time
 from typing import Optional
 from app.settings import settings
+from app.observability.metrics import metrics_collector
+from app.observability.logging import llm_logger
+from app.cache.lru_cache import response_cache
 
 
 class YandexLLMError(Exception):
@@ -31,6 +35,25 @@ async def complete_text(
     Raises:
         YandexLLMError: If the API call fails
     """
+    start_time = time.time()
+    
+    # Check cache first
+    cached_response = response_cache.get_llm_response(
+        system_prompt, user_message, 
+        temperature=temperature, max_tokens=max_tokens
+    )
+    if cached_response is not None:
+        llm_logger.info("LLM cache hit", extra_fields={
+            "cache_hit": True,
+            "response_length": len(cached_response)
+        })
+        return cached_response
+    
+    llm_logger.info("LLM cache miss, making API request", extra_fields={
+        "cache_hit": False,
+        "user_message_length": len(user_message)
+    })
+    
     payload = {
         "modelUri": settings.yandex_llm_model,
         "completionOptions": {
@@ -59,13 +82,39 @@ async def complete_text(
             response.raise_for_status()
 
             data = response.json()
-            return data["result"]["alternatives"][0]["message"]["text"].strip()
+            result = data["result"]["alternatives"][0]["message"]["text"].strip()
+            
+            # Cache the response
+            response_cache.set_llm_response(
+                system_prompt, user_message, result,
+                temperature=temperature, max_tokens=max_tokens
+            )
+            
+            # Record metrics
+            duration = time.time() - start_time
+            metrics_collector.record_llm_request("success", settings.yandex_llm_model, duration)
+            
+            llm_logger.info("LLM request successful", extra_fields={
+                "duration_seconds": duration,
+                "response_length": len(result)
+            })
+            
+            return result
 
     except httpx.HTTPError as e:
+        duration = time.time() - start_time
+        metrics_collector.record_llm_request("error", settings.yandex_llm_model, duration)
+        llm_logger.error(f"LLM HTTP error: {e}", extra_fields={"duration_seconds": duration})
         raise YandexLLMError(f"Yandex LLM API error: {e}")
     except (KeyError, IndexError) as e:
+        duration = time.time() - start_time
+        metrics_collector.record_llm_request("error", settings.yandex_llm_model, duration)
+        llm_logger.error(f"LLM response format error: {e}", extra_fields={"duration_seconds": duration})
         raise YandexLLMError(f"Unexpected response format: {e}")
     except Exception as e:
+        duration = time.time() - start_time
+        metrics_collector.record_llm_request("error", settings.yandex_llm_model, duration)
+        llm_logger.error(f"LLM unexpected error: {e}", extra_fields={"duration_seconds": duration})
         raise YandexLLMError(f"Unexpected error: {e}")
 
 
